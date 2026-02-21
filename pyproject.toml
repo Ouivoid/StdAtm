@@ -3,7 +3,7 @@ name = "stdatm"
 dynamic = ["version"]
 description = "Numpy-oriented Standard Atmosphere model"
 authors = [{ name = "Christophe DAVID", email = "christophe.david@onera.fr" }]
-requires-python = ">=3.8,<4"
+requires-python = ">=3.9,<4"
 readme = "README.md"
 license = "GPL-3.0-only"
 classifiers = [
@@ -16,18 +16,17 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Physics",
 ]
 dependencies = [
-    "numpy>=1.22.0, <1.25 ; python_full_version >= '3.8' and python_full_version < '3.9'",
     "numpy>=1.23.2, <3 ; python_full_version >= '3.9' and python_full_version < '3.12'",
     "numpy>=1.26, <3 ; python_full_version >= '3.12' and python_full_version < '4'",
-    "scipy>=1.9.3, <1.11 ; python_full_version >= '3.8' and python_full_version < '3.9'",
     "scipy>=1.10,<2 ; python_full_version >= '3.9' and python_full_version < '3.12'",
     "scipy>=1.11.2,<2 ; python_full_version >= '3.12' and python_full_version < '4'",
 ]
