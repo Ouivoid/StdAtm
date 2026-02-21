@@ -1,6 +1,6 @@
 [project]
 name = "stdatm"
-version = "0.4.3"
+dynamic = ["version"]
 description = "Numpy-oriented Standard Atmosphere model"
 authors = [{ name = "Christophe DAVID", email = "christophe.david@onera.fr" }]
 requires-python = ">=3.8,<4"
@@ -59,6 +59,9 @@ lint = [
 [tool.uv]
 default-groups = "all"
 
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
 [tool.hatch.build.targets.sdist]
 include = ["src/stdatm"]
 exclude = ["**/tests/**"]
@@ -71,7 +74,7 @@ exclude = ["**/tests/**"]
 "src/stdatm" = "stdatm"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
 
 [tool.ruff]
