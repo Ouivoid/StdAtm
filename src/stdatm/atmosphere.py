@@ -112,7 +112,7 @@ class Atmosphere:
                                  it should be provided in meters.
         """
 
-        # For convenience, let's have altitude in meters in all cases
+        # For convenience, let's have altitude in meters in all cases.
         unit_coeff = foot if altitude_in_feet else 1.0
         try:
             self._altitude = altitude * unit_coeff
