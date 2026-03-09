@@ -365,7 +365,7 @@ def get_atmosphere(altitude):
     return atm
 
 
-def test_performances_temperature_array(altitude, benchmark):
+def test_performances_array_temperature(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.temperature
@@ -373,7 +373,7 @@ def test_performances_temperature_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_pressure_array(altitude, benchmark):
+def test_performances_array_pressure(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.pressure
@@ -381,7 +381,7 @@ def test_performances_pressure_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_density_array(altitude, benchmark):
+def test_performances_array_density(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.density
@@ -389,7 +389,7 @@ def test_performances_density_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_dynamic_viscosity_array(altitude, benchmark):
+def test_performances_array_dynamic_viscosity(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.dynamic_viscosity
@@ -397,7 +397,7 @@ def test_performances_dynamic_viscosity_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_kinematic_viscosity_array(altitude, benchmark):
+def test_performances_array_kinematic_viscosity(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.kinematic_viscosity
@@ -405,7 +405,7 @@ def test_performances_kinematic_viscosity_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_speed_of_sound_array(altitude, benchmark):
+def test_performances_array_speed_of_sound(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.speed_of_sound
@@ -413,7 +413,7 @@ def test_performances_speed_of_sound_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_TAS_array(altitude, benchmark):
+def test_performances_array_TAS(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.true_airspeed
@@ -421,7 +421,7 @@ def test_performances_TAS_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_EAS_array(altitude, benchmark):
+def test_performances_array_EAS(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.equivalent_airspeed
@@ -429,7 +429,7 @@ def test_performances_EAS_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_CAS_array(altitude, benchmark):
+def test_performances_array_CAS(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.calibrated_airspeed
@@ -437,7 +437,7 @@ def test_performances_CAS_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_mach_array(altitude, benchmark):
+def test_performances_array_mach(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.mach
@@ -445,7 +445,7 @@ def test_performances_mach_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_unit_Re_array(altitude, benchmark):
+def test_performances_array_unit_Re(altitude, benchmark):
     def func():
         atm = get_atmosphere(altitude)
         _ = atm.unitary_reynolds
@@ -453,7 +453,7 @@ def test_performances_unit_Re_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_reask_array(altitude, benchmark):
+def test_performances_array_reask(altitude, benchmark):
     atm = get_atmosphere(altitude)
     _ = atm.temperature
     _ = atm.pressure
@@ -481,7 +481,7 @@ def test_performances_reask_array(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_temperature_scalar(altitude, benchmark):
+def test_performances_scalar_temperature(altitude, benchmark):
     def func():
         for alt in altitude[::1000]:
             atm = AtmosphereSI(alt)
@@ -490,7 +490,7 @@ def test_performances_temperature_scalar(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_pressure_scalar(altitude, benchmark):
+def test_performances_scalar_pressure(altitude, benchmark):
     def func():
         for alt in altitude[::1000]:
             atm = AtmosphereSI(alt)
@@ -499,34 +499,7 @@ def test_performances_pressure_scalar(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_density_scalar(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            _ = atm.density
-
-    benchmark(func)
-
-
-def test_performances_dynamic_viscosity_scalar(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            _ = atm.dynamic_viscosity
-
-    benchmark(func)
-
-
-def test_performances_kinematic_viscosity_scalar(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            _ = atm.kinematic_viscosity
-
-    benchmark(func)
-
-
-def test_performances_speed_of_sound_scalar(altitude, benchmark):
+def test_performances_scalar_speed_of_sound(altitude, benchmark):
     def func():
         for alt in altitude[::1000]:
             atm = AtmosphereSI(alt)
@@ -535,7 +508,34 @@ def test_performances_speed_of_sound_scalar(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_loop_speeds_init_TAS(altitude, benchmark):
+def test_performances_scalar_density(altitude, benchmark):
+    def func():
+        for alt in altitude[::1000]:
+            atm = AtmosphereSI(alt)
+            _ = atm.density
+
+    benchmark(func)
+
+
+def test_performances_scalar_dynamic_viscosity(altitude, benchmark):
+    def func():
+        for alt in altitude[::1000]:
+            atm = AtmosphereSI(alt)
+            _ = atm.dynamic_viscosity
+
+    benchmark(func)
+
+
+def test_performances_scalar_kinematic_viscosity(altitude, benchmark):
+    def func():
+        for alt in altitude[::1000]:
+            atm = AtmosphereSI(alt)
+            _ = atm.kinematic_viscosity
+
+    benchmark(func)
+
+
+def test_performances_scalar_speeds_init_TAS(altitude, benchmark):
     def func():
         for alt in altitude[::1000]:
             atm = AtmosphereSI(alt)
@@ -549,7 +549,7 @@ def test_performances_loop_speeds_init_TAS(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_loop_speeds_init_EAS(altitude, benchmark):
+def test_performances_scalar_speeds_init_EAS(altitude, benchmark):
     def func():
         for alt in altitude[::1000]:
             atm = AtmosphereSI(alt)
@@ -563,7 +563,7 @@ def test_performances_loop_speeds_init_EAS(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_loop_speeds_init_mach(altitude, benchmark):
+def test_performances_scalar_speeds_init_mach(altitude, benchmark):
     def func():
         for alt in altitude[::1000]:
             atm = AtmosphereSI(alt)
@@ -577,7 +577,7 @@ def test_performances_loop_speeds_init_mach(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_loop_CAS_init_TAS(altitude, benchmark):
+def test_performances_scalar_CAS_init_TAS(altitude, benchmark):
     def func():
         for alt in altitude[::1000]:
             atm = AtmosphereSI(alt)
@@ -587,7 +587,7 @@ def test_performances_loop_CAS_init_TAS(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_loop_CAS_init_mach(altitude, benchmark):
+def test_performances_scalar_CAS_init_mach(altitude, benchmark):
     def func():
         for alt in altitude[::1000]:
             atm = AtmosphereSI(alt)
@@ -597,7 +597,7 @@ def test_performances_loop_CAS_init_mach(altitude, benchmark):
     benchmark(func)
 
 
-def test_performances_loop_TAS_init_CAS(altitude, benchmark):
+def test_performances_scalar_TAS_init_CAS(altitude, benchmark):
     def func():
         for alt in altitude[::10000]:
             atm = AtmosphereSI(alt)
