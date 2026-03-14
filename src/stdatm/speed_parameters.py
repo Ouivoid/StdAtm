@@ -227,9 +227,9 @@ def _compute_cas_high_speed(impact_pressure):
     solution = root(
         _equation_cas_high_speed,
         x0=SEA_LEVEL_SPEED_OF_SOUND * np.ones_like(impact_pressure),
-        args=(impact_pressure,),
+        args=(impact_pressure.ravel(),),
     )
-    return solution.x
+    return np.reshape(solution.x, impact_pressure.shape)
 
 
 @_compute_cas_high_speed.register
