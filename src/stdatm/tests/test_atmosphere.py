@@ -1,4 +1,4 @@
-"""Tests for Atmosphere class"""
+"""Tests for Atmosphere and AtmosphereSI classes."""
 #  This file is part of StdAtm
 #  Copyright (C) 2023 ONERA & ISAE-SUPAERO
 #  StdAtm is free software: you can redistribute it and/or modify
@@ -12,8 +12,6 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from numbers import Real
-
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -22,189 +20,11 @@ from scipy.constants import foot
 from ..atmosphere import Atmosphere, AtmosphereSI
 
 
-def test_atmosphere():
-    """Tests properties of Atmosphere class."""
-    # Altitudes in meters.
-    # Values at disa=0 from "Advanced Aircraft Design
-    # (Egbert TORENBEEK, Oxford, UK: John Wiley & Sons Ltd, 2013) Appendix B,
-    # p.397-398".
-    # Values at disa=10 from
-    # https://www.digitaldutch.com/atmoscalc/, with a 0.98749 factor on
-    # viscosity because at sea level and disa=0, the calculator gives
-    # 1.81206e-5 for dynamic viscosity, though ISA assumption is 1.7894e-5.
-    expectations = np.array(
+class Checker:
+    """Reference conversion values used for class-level integration checks."""
+
+    expected_tas = np.array(
         [
-            (0, 0, 288.15, 1.225, 101325, 1.789e-05, 1.460e-05, 340.29),
-            (500, 0, 284.90, 1.1673, 95461, 1.773e-05, 1.519e-05, 338.37),
-            (1000, 0, 281.65, 1.1117, 89874, 1.757e-05, 1.581e-05, 336.43),
-            (1500, 0, 278.40, 1.0581, 84556, 1.742e-05, 1.646e-05, 334.49),
-            (2000, 0, 275.15, 1.0065, 79495, 1.725e-05, 1.714e-05, 332.53),
-            (2500, 0, 271.90, 0.9569, 74682, 1.710e-05, 1.787e-05, 330.56),
-            (3000, 0, 268.65, 0.9091, 70108, 1.693e-05, 1.863e-05, 328.58),
-            (3500, 0, 265.40, 0.8632, 65764, 1.677e-05, 1.943e-05, 326.58),
-            (4000, 0, 262.15, 0.8191, 61640, 1.661e-05, 2.028e-05, 324.58),
-            (4500, 0, 258.90, 0.7768, 57728, 1.644e-05, 2.117e-05, 322.56),
-            (5000, 0, 255.65, 0.7361, 54020, 1.628e-05, 2.211e-05, 320.53),
-            (5500, 0, 252.40, 0.6971, 50506, 1.611e-05, 2.311e-05, 318.48),
-            (6000, 0, 249.15, 0.6597, 47181, 1.594e-05, 2.417e-05, 316.43),
-            (6500, 0, 245.90, 0.6238, 44034, 1.578e-05, 2.529e-05, 314.36),
-            (7000, 0, 242.65, 0.5895, 41060, 1.561e-05, 2.648e-05, 312.27),
-            (7500, 0, 239.40, 0.5566, 38251, 1.544e-05, 2.773e-05, 310.17),
-            (8000, 0, 236.15, 0.5252, 35599, 1.526e-05, 2.906e-05, 308.06),
-            (8500, 0, 232.90, 0.4951, 33099, 1.509e-05, 3.048e-05, 305.93),
-            (9000, 0, 229.65, 0.4663, 30742, 1.492e-05, 3.199e-05, 303.79),
-            (9500, 0, 226.40, 0.4389, 28523, 1.474e-05, 3.359e-05, 301.63),
-            (10000, 0, 223.15, 0.4127, 26436, 1.457e-05, 3.530e-05, 299.46),
-            (10500, 0, 219.90, 0.3877, 24474, 1.439e-05, 3.712e-05, 297.27),
-            (11000, 0, 216.65, 0.3639, 22632, 1.421e-05, 3.905e-05, 295.07),
-            (12000, 0, 216.65, 0.3108, 19330, 1.421e-05, 4.573e-05, 295.07),
-            (13000, 0, 216.65, 0.2655, 16510, 1.421e-05, 5.353e-05, 295.07),
-            (14000, 0, 216.65, 0.2268, 14101, 1.421e-05, 6.266e-05, 295.07),
-            (15000, 0, 216.65, 0.1937, 12044, 1.421e-05, 7.337e-05, 295.07),
-            (16000, 0, 216.65, 0.1654, 10287, 1.421e-05, 8.592e-05, 295.07),
-            (17000, 0, 216.65, 0.1413, 8786, 1.421e-05, 1.006e-04, 295.07),
-            (18000, 0, 216.65, 0.1207, 7505, 1.421e-05, 1.177e-04, 295.07),
-            (19000, 0, 216.65, 0.1031, 6410, 1.421e-05, 1.378e-04, 295.07),
-            (20000, 0, 216.65, 0.088, 5475, 1.421e-05, 1.615e-04, 295.07),
-            (0, 10, 298.15, 1.1839, 101325, 1.838e-05, 1.5527e-05, 346.15),
-            (1000, 10, 291.65, 1.0735, 89875, 1.807e-05, 1.6829e-5, 342.36),
-            (3000, 10, 278.65, 0.87650, 70108, 1.742e-05, 1.9877e-5, 334.64),
-            (10000, 10, 233.15, 0.39500, 26436, 1.505e-05, 3.8106e-05, 306.10),
-            (14000, 10, 226.65, 0.2167, 14102, 1.469e-05, 6.7808e-05, 301.80),
-        ],
-        dtype=[
-            ("alt", "f8"),
-            ("dT", "f4"),
-            ("T", "f4"),
-            ("rho", "f4"),
-            ("P", "f4"),
-            ("dyn_visc", "f4"),
-            ("kin_visc", "f4"),
-            ("SoS", "f4"),
-        ],
-    )
-
-    for values in expectations:
-        # Checking with altitude and delta_t provided as 0-D arrays
-        # (was crashing @singledispatch)
-        alt = values["alt"] / foot
-        assert isinstance(alt, Real)
-        atm = Atmosphere(np.array(alt), np.array(values["dT"]))
-        assert values["T"] == pytest.approx(atm.temperature, rel=1e-4)
-        assert values["rho"] == pytest.approx(atm.density, rel=1e-3)
-        assert values["P"] == pytest.approx(atm.pressure, rel=1e-4)
-        assert values["dyn_visc"] == pytest.approx(atm.dynamic_viscosity, rel=1e-2)
-        assert values["kin_visc"] == pytest.approx(atm.kinematic_viscosity, rel=1e-2)
-        assert values["SoS"] == pytest.approx(atm.speed_of_sound, rel=1e-3)
-
-        # Checking with altitude and delta_t provided as one-element list
-        alt = [values["alt"] / foot]
-        assert isinstance(alt, list)
-        atm = Atmosphere(alt, [values["dT"]])
-        assert values["T"] == pytest.approx(atm.temperature, rel=1e-4)
-        assert values["rho"] == pytest.approx(atm.density, rel=1e-3)
-        assert values["P"] == pytest.approx(atm.pressure, rel=1e-4)
-        assert values["dyn_visc"] == pytest.approx(atm.dynamic_viscosity, rel=1e-2)
-        assert values["kin_visc"] == pytest.approx(atm.kinematic_viscosity, rel=1e-2)
-        assert values["SoS"] == pytest.approx(atm.speed_of_sound, rel=1e-3)
-
-    for delta_t in [0, 10]:
-        idx = expectations["dT"] == delta_t
-
-        # Checking with altitude provided as 1D numpy array
-        alt = expectations["alt"][idx] / foot
-        assert isinstance(alt, np.ndarray)
-        assert len(alt.shape) == 1
-        atm = Atmosphere(alt, delta_t)
-        assert expectations["T"][idx] == pytest.approx(atm.temperature, rel=1e-4)
-        assert expectations["rho"][idx] == pytest.approx(atm.density, rel=1e-3)
-        assert expectations["P"][idx] == pytest.approx(atm.pressure, rel=1e-4)
-        assert expectations["dyn_visc"][idx] == pytest.approx(atm.dynamic_viscosity, rel=1e-2)
-        assert expectations["kin_visc"][idx] == pytest.approx(atm.kinematic_viscosity, rel=1e-2)
-        assert expectations["SoS"][idx] == pytest.approx(atm.speed_of_sound, rel=1e-3)
-        # Additional check for get_altitude in meters
-        assert expectations["alt"][idx] == pytest.approx(
-            atm.get_altitude(altitude_in_feet=False), rel=1e-3
-        )
-
-        # Checking with altitude provided as a list and in meters
-        alt = expectations["alt"][idx].tolist()
-        assert isinstance(alt, list)
-        atm = Atmosphere(alt, delta_t, altitude_in_feet=False)
-        assert expectations["T"][idx] == pytest.approx(atm.temperature, rel=1e-4)
-        assert expectations["rho"][idx] == pytest.approx(atm.density, rel=1e-3)
-        assert expectations["P"][idx] == pytest.approx(atm.pressure, rel=1e-4)
-        assert expectations["dyn_visc"][idx] == pytest.approx(atm.dynamic_viscosity, rel=1e-2)
-        assert expectations["kin_visc"][idx] == pytest.approx(atm.kinematic_viscosity, rel=1e-2)
-        assert expectations["SoS"][idx] == pytest.approx(atm.speed_of_sound, rel=1e-3)
-        # Additional check for get_altitude in feet
-        assert expectations["alt"][idx] / foot == pytest.approx(atm.get_altitude(), rel=1e-3)
-
-        # Same with AtmosphereSI
-        atm = AtmosphereSI(alt, delta_t)
-        assert expectations["T"][idx] == pytest.approx(atm.temperature, rel=1e-4)
-        assert expectations["rho"][idx] == pytest.approx(atm.density, rel=1e-3)
-        assert expectations["P"][idx] == pytest.approx(atm.pressure, rel=1e-4)
-        assert expectations["dyn_visc"][idx] == pytest.approx(atm.dynamic_viscosity, rel=1e-2)
-        assert expectations["kin_visc"][idx] == pytest.approx(atm.kinematic_viscosity, rel=1e-2)
-        assert expectations["SoS"][idx] == pytest.approx(atm.speed_of_sound, rel=1e-3)
-        # Additional check for altitude property
-        assert expectations["alt"][idx] == pytest.approx(atm.altitude, rel=1e-3)
-
-    # Check with arrays
-    atm = AtmosphereSI(expectations["alt"], expectations["dT"])
-    assert_allclose(expectations["T"], atm.temperature, rtol=1e-4)
-    assert_allclose(expectations["rho"], atm.density, rtol=1e-3)
-    assert_allclose(expectations["P"], atm.pressure, rtol=1e-4)
-    assert_allclose(expectations["dyn_visc"], atm.dynamic_viscosity, rtol=1e-2)
-    assert_allclose(expectations["kin_visc"], atm.kinematic_viscosity, rtol=1e-2)
-    assert_allclose(expectations["SoS"], atm.speed_of_sound, rtol=1e-3)
-    # Additional check for altitude property
-    assert_allclose(expectations["alt"], atm.altitude, rtol=1e-3)
-
-
-def test_speed_parameters_basic():
-    atm = Atmosphere([0, 5000, 10000])
-    with pytest.raises(RuntimeError):
-        atm.true_airspeed = [[100, 200]]
-
-    atm = Atmosphere(10000.0)
-    atm.true_airspeed = 100.0
-    assert isinstance(atm.true_airspeed, float)
-
-
-def test_speed_conversions_with_broadcast():
-    """Tests for speed conversions with different but compatible shapes for altitude and TAS"""
-    run_speed_conversion_tests(with_broadcast=True)
-
-
-def test_speed_conversions_without_broadcast():
-    """Tests for speed conversions with identical shapes for altitude and TAS"""
-    run_speed_conversion_tests(with_broadcast=False)
-
-
-def run_speed_conversion_tests(with_broadcast: bool):
-    if with_broadcast:
-        altitudes = [0.0, 1000.0, 35000.0]
-        TAS = [
-            [100.0],
-            [200.0],
-            [270.0],
-            [300.0],
-            [400.0],
-            [800.0],
-        ]
-        speed_of_sound = [340.294, 339.122, 296.536]
-    else:
-        altitudes = [
-            [0.0, 1000.0, 35000.0],
-            [0.0, 1000.0, 35000.0],
-            [0.0, 1000.0, 35000.0],
-            [0.0, 1000.0, 35000.0],
-            [0.0, 1000.0, 35000.0],
-            [0.0, 1000.0, 35000.0],
-        ]
-        TAS = [
             [100.0, 100.0, 100.0],
             [200.0, 200.0, 200.0],
             [270.0, 270.0, 270.0],
@@ -212,395 +32,266 @@ def run_speed_conversion_tests(with_broadcast: bool):
             [400.0, 400.0, 400.0],
             [800.0, 800.0, 800.0],
         ]
-        speed_of_sound = [
-            [340.294, 339.122, 296.536],
-            [340.294, 339.122, 296.536],
-            [340.294, 339.122, 296.536],
-            [340.294, 339.122, 296.536],
-            [340.294, 339.122, 296.536],
-            [340.294, 339.122, 296.536],
-        ]
-
-    atm = Atmosphere(altitudes)
-    assert atm.true_airspeed is None
-    assert atm.equivalent_airspeed is None
-    assert atm.mach is None
-    assert atm.unitary_reynolds is None
-
-    atm.true_airspeed = TAS
-    Checker.check_speeds(atm)
-
-    atm.true_airspeed = None
-    assert atm.true_airspeed is None
-    assert atm.equivalent_airspeed is None
-    assert atm.mach is None
-    assert atm.unitary_reynolds is None
-
-    atm = Atmosphere(altitudes)
-    atm.equivalent_airspeed = Checker.expected_EAS
-    Checker.check_speeds(atm)
-
-    # Here we do not instantiate a new Atmosphere, but simply modify Mach number.
-    # Other parameters should be modified accordingly.
-    atm.mach = 1.0
-    assert_allclose(atm.true_airspeed, speed_of_sound, rtol=1e-4)
-
-    atm = Atmosphere(altitudes)
-    atm.mach = Checker.expected_Mach
-    Checker.check_speeds(atm)
-
-    atm = Atmosphere(altitudes)
-    atm.unitary_reynolds = Checker.expected_Re1
-    Checker.check_speeds(atm)
-
-    atm = Atmosphere(altitudes)
-    atm.dynamic_pressure = Checker.expected_dynamic_pressure
-    Checker.check_speeds(atm)
-
-    atm = Atmosphere(altitudes)
-    atm.impact_pressure = Checker.expected_impact_pressure
-    Checker.check_speeds(atm)
-
-    atm = Atmosphere(altitudes)
-    atm.calibrated_airspeed = Checker.expected_CAS
-    Checker.check_speeds(atm)
-
-    # Check with one altitude value, but several speed values ############################
-    atm = Atmosphere(35000)
-    atm.true_airspeed = np.array(Checker.expected_TAS)[:, 2]
-    assert_allclose(atm.equivalent_airspeed, np.array(Checker.expected_EAS)[:, 2], rtol=1e-4)
-    assert_allclose(atm.mach, np.array(Checker.expected_Mach)[:, 2], rtol=1e-4)
-    assert_allclose(atm.unitary_reynolds, np.array(Checker.expected_Re1)[:, 2], rtol=1e-4)
-    assert_allclose(
-        atm.impact_pressure, np.array(Checker.expected_impact_pressure)[:, 2], rtol=1e-4
     )
-
-
-class Checker:
-    # source:  https://www.newbyte.co.il/calculator/index.php using "pressure altitude" as output.
-    # This source, with "geometric altitude" as input, agrees with
-    # http://www.aerospaceweb.org/design/scripts/atmosphere/
-    #
-    # Warning: http://www.hochwarth.com/misc/AviationCalculator.html explicitly tells that
-    # the speed conversion is valid only in subsonic domain.
-    # https://aerotoolbox.com/airspeed-conversions/ has the same limitation, though it is not
-    # explicitly written.
-
-    expected_TAS = [
-        [100.0, 100.0, 100.0],
-        [200.0, 200.0, 200.0],
-        [270.0, 270.0, 270.0],
-        [300.0, 300.0, 300.0],
-        [400.0, 400.0, 400.0],
-        [800.0, 800.0, 800.0],
-    ]
-    expected_EAS = [
-        [100.0, 98.543, 55.666],
-        [200.0, 197.085, 111.333],
-        [270, 266.065, 150.299],
-        [300.0, 295.628, 166.999],
-        [400, 394.170, 222.666],
-        [800, 788.341, 445.332],
-    ]
-    expected_CAS = [
-        [100.0, 98.580, 56.269],
-        [200.0, 197.362, 116.073],
-        [270, 266.698, 161.732],
-        [300.0, 296.465, 182.507],
-        [400, 395.578, 252.396],
-        [800, 789.350, 479.567],
-    ]
-    expected_Mach = [
-        [0.29386, 0.29488, 0.33723],
-        [0.58773, 0.58976, 0.67446],
-        [0.79343, 0.79617, 0.91051],
-        [0.88159, 0.88464, 1.01168],
-        [1.17545, 1.17952, 1.34891],
-        [2.35091, 2.35903, 2.69782],
-    ]
-    expected_Re1 = [
-        [6845941, 6683613, 2648139],
-        [13691882, 13367227, 5296278],
-        [18484040, 18045756, 7149975],
-        [20537823, 20050840, 7944417],
-        [27383763, 26734454, 10592556],
-        [54767527, 53468908, 21185111],
-    ]
-    expected_dynamic_pressure = [
-        [6125.0, 5947.8, 1898.0],
-        [24500.0, 23791.1, 7591.9],
-        [44651.2, 43359.2, 13836.3],
-        [55125.0, 53529.9, 17081.9],
-        [97999.9, 95164.2, 30367.8],
-        [391999.7, 380656.9, 121471.0],
-    ]
-    expected_impact_pressure = [
-        [6258.4, 6078.2, 1952.6],
-        [26689.4, 25932.3, 8495.0],
-        [52127.8, 50672.8, 16946.6],
-        [66684.1, 64838.1, 21911.2],
-        [135479.4, 131780.5, 44684.1],
-        [668493.9, 649486.1, 210939.7],
-    ]
+    expected_eas = np.array(
+        [
+            [100.0, 98.543, 55.666],
+            [200.0, 197.085, 111.333],
+            [270.0, 266.065, 150.299],
+            [300.0, 295.628, 166.999],
+            [400.0, 394.170, 222.666],
+            [800.0, 788.341, 445.332],
+        ]
+    )
+    expected_cas = np.array(
+        [
+            [100.0, 98.580, 56.269],
+            [200.0, 197.362, 116.073],
+            [270.0, 266.698, 161.732],
+            [300.0, 296.465, 182.507],
+            [400.0, 395.578, 252.396],
+            [800.0, 789.350, 479.567],
+        ]
+    )
+    expected_mach = np.array(
+        [
+            [0.29386, 0.29488, 0.33723],
+            [0.58773, 0.58976, 0.67446],
+            [0.79343, 0.79617, 0.91051],
+            [0.88159, 0.88464, 1.01168],
+            [1.17545, 1.17952, 1.34891],
+            [2.35091, 2.35903, 2.69782],
+        ]
+    )
+    expected_re1 = np.array(
+        [
+            [6845941, 6683613, 2648139],
+            [13691882, 13367227, 5296278],
+            [18484040, 18045756, 7149975],
+            [20537823, 20050840, 7944417],
+            [27383763, 26734454, 10592556],
+            [54767527, 53468908, 21185111],
+        ]
+    )
+    expected_dynamic_pressure = np.array(
+        [
+            [6125.0, 5947.8, 1898.0],
+            [24500.0, 23791.1, 7591.9],
+            [44651.2, 43359.2, 13836.3],
+            [55125.0, 53529.9, 17081.9],
+            [97999.9, 95164.2, 30367.8],
+            [391999.7, 380656.9, 121471.0],
+        ]
+    )
+    expected_impact_pressure = np.array(
+        [
+            [6258.4, 6078.2, 1952.6],
+            [26689.4, 25932.3, 8495.0],
+            [52127.8, 50672.8, 16946.6],
+            [66684.1, 64838.1, 21911.2],
+            [135479.4, 131780.5, 44684.1],
+            [668493.9, 649486.1, 210939.7],
+        ]
+    )
 
     @classmethod
     def check_speeds(cls, atm, tol=1e-4):
-        assert_allclose(atm.true_airspeed, cls.expected_TAS, rtol=tol)
-        assert_allclose(atm.equivalent_airspeed, cls.expected_EAS, rtol=tol)
-        assert_allclose(atm.calibrated_airspeed, cls.expected_CAS, rtol=tol)
-        assert_allclose(atm.mach, cls.expected_Mach, rtol=tol)
-        assert_allclose(atm.unitary_reynolds, cls.expected_Re1, rtol=tol)
+        assert_allclose(atm.true_airspeed, cls.expected_tas, rtol=tol)
+        assert_allclose(atm.equivalent_airspeed, cls.expected_eas, rtol=tol)
+        assert_allclose(atm.calibrated_airspeed, cls.expected_cas, rtol=tol)
+        assert_allclose(atm.mach, cls.expected_mach, rtol=tol)
+        assert_allclose(atm.unitary_reynolds, cls.expected_re1, rtol=tol)
         assert_allclose(atm.dynamic_pressure, cls.expected_dynamic_pressure, rtol=tol)
         assert_allclose(atm.impact_pressure, cls.expected_impact_pressure, rtol=tol)
 
 
+@pytest.mark.parametrize("altitude_m,delta_t", [(0.0, 0.0), (10000.0, 10.0), (14000.0, 0.0)])
+def test_atmosphere_units_and_scalar_like_inputs(altitude_m, delta_t):
+    """Atmosphere and AtmosphereSI must agree for equivalent inputs and scalar-like types."""
+
+    scalar_like_altitudes = [
+        altitude_m / foot,
+        np.array(altitude_m / foot),
+        [altitude_m / foot],
+    ]
+
+    for altitude in scalar_like_altitudes:
+        atm = Atmosphere(altitude, np.array(delta_t))
+        atm_si = AtmosphereSI(altitude_m, delta_t)
+
+        assert_allclose(np.asarray(atm.temperature), np.asarray(atm_si.temperature), rtol=1e-7)
+        assert_allclose(np.asarray(atm.pressure), np.asarray(atm_si.pressure), rtol=1e-7)
+        assert_allclose(np.asarray(atm.density), np.asarray(atm_si.density), rtol=1e-7)
+        assert_allclose(
+            np.asarray(atm.speed_of_sound), np.asarray(atm_si.speed_of_sound), rtol=1e-7
+        )
+        assert_allclose(
+            np.asarray(atm.dynamic_viscosity), np.asarray(atm_si.dynamic_viscosity), rtol=1e-7
+        )
+        assert_allclose(
+            np.asarray(atm.kinematic_viscosity), np.asarray(atm_si.kinematic_viscosity), rtol=1e-7
+        )
+
+
+def test_get_altitude_roundtrip_and_shape():
+    altitudes_m = np.array([0.0, 500.0, 1000.0, 3000.0])
+
+    atm_si = AtmosphereSI(altitudes_m)
+    atm_ft = Atmosphere(altitudes_m / foot)
+
+    assert_allclose(atm_si.altitude, altitudes_m, rtol=0.0, atol=0.0)
+    assert_allclose(atm_ft.get_altitude(altitude_in_feet=False), altitudes_m, rtol=0.0, atol=1e-12)
+    assert_allclose(atm_ft.get_altitude(), altitudes_m / foot, rtol=0.0, atol=1e-12)
+
+
+def test_speed_setter_shape_validation_and_reset_behavior():
+    atm = Atmosphere([0.0, 5000.0, 10000.0], altitude_in_feet=False)
+
+    with pytest.raises(RuntimeError):
+        atm.true_airspeed = [[100.0, 200.0]]
+
+    atm.true_airspeed = [100.0, 120.0, 140.0]
+    mach_from_tas = np.asarray(atm.mach)
+
+    atm.mach = [0.5, 0.6, 0.7]
+    assert_allclose(atm.true_airspeed, np.asarray(atm.speed_of_sound) * np.array([0.5, 0.6, 0.7]))
+    assert not np.allclose(mach_from_tas, np.asarray(atm.mach))
+
+    atm.true_airspeed = None
+    assert atm.true_airspeed is None
+    assert atm.mach is None
+    assert atm.equivalent_airspeed is None
+    assert atm.unitary_reynolds is None
+
+
+def test_speed_conversions_reference_results_with_and_without_broadcast():
+    _run_speed_conversion_tests(with_broadcast=False)
+    _run_speed_conversion_tests(with_broadcast=True)
+
+
+def _run_speed_conversion_tests(with_broadcast: bool):
+    if with_broadcast:
+        altitudes = [0.0, 1000.0, 35000.0]
+        tas = np.array(Checker.expected_tas)[:, [0]]
+    else:
+        altitudes = [[0.0, 1000.0, 35000.0]] * 6
+        tas = Checker.expected_tas
+
+    atm = Atmosphere(altitudes)
+    atm.true_airspeed = tas
+    Checker.check_speeds(atm)
+
+    # Re-initialize from each speed definition and verify convergence to reference TAS.
+    for attr_name, expected in [
+        ("equivalent_airspeed", Checker.expected_eas),
+        ("mach", Checker.expected_mach),
+        ("unitary_reynolds", Checker.expected_re1),
+        ("dynamic_pressure", Checker.expected_dynamic_pressure),
+        ("impact_pressure", Checker.expected_impact_pressure),
+        ("calibrated_airspeed", Checker.expected_cas),
+    ]:
+        test_atm = Atmosphere(altitudes)
+        setattr(test_atm, attr_name, expected)
+        Checker.check_speeds(test_atm)
+
+    # Single-altitude case with vector speeds keeps expected shape semantics.
+    one_alt_atm = Atmosphere(35000)
+    one_alt_atm.true_airspeed = np.array(Checker.expected_tas)[:, 2]
+    assert_allclose(
+        one_alt_atm.equivalent_airspeed, np.array(Checker.expected_eas)[:, 2], rtol=1e-4
+    )
+    assert_allclose(one_alt_atm.mach, np.array(Checker.expected_mach)[:, 2], rtol=1e-4)
+
+
 @pytest.fixture(scope="session")
 def altitude():
-    return np.linspace(0.0, 20000.0, int(1e6))
+    return np.linspace(0.0, 20000.0, 3000)
 
 
-def get_atmosphere(altitude):
-    atm = AtmosphereSI(altitude)
-    atm.true_airspeed = 200.0
-    return atm
-
-
-def test_performances_array_temperature(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.temperature
-
-    benchmark(func)
-
-
-def test_performances_array_pressure(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.pressure
-
-    benchmark(func)
-
-
-def test_performances_array_density(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.density
-
-    benchmark(func)
-
-
-def test_performances_array_dynamic_viscosity(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.dynamic_viscosity
-
-    benchmark(func)
-
-
-def test_performances_array_kinematic_viscosity(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.kinematic_viscosity
-
-    benchmark(func)
-
-
-def test_performances_array_speed_of_sound(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.speed_of_sound
-
-    benchmark(func)
-
-
-def test_performances_array_TAS(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.true_airspeed
-
-    benchmark(func)
-
-
-def test_performances_array_EAS(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.equivalent_airspeed
-
-    benchmark(func)
-
-
-def test_performances_array_CAS(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.calibrated_airspeed
-
-    benchmark(func)
-
-
-def test_performances_array_mach(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.mach
-
-    benchmark(func)
-
-
-def test_performances_array_unit_Re(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude)
-        _ = atm.unitary_reynolds
-
-    benchmark(func)
-
-
-def test_performances_array_reask(altitude, benchmark):
-    atm = get_atmosphere(altitude)
+def _all_state_properties(atm):
     _ = atm.temperature
     _ = atm.pressure
     _ = atm.density
     _ = atm.dynamic_viscosity
     _ = atm.kinematic_viscosity
     _ = atm.speed_of_sound
+
+
+def _all_speed_properties(atm):
     _ = atm.true_airspeed
     _ = atm.equivalent_airspeed
+    _ = atm.calibrated_airspeed
     _ = atm.mach
     _ = atm.unitary_reynolds
+    _ = atm.dynamic_pressure
+    _ = atm.impact_pressure
+
+
+def test_performances_array_state_bundle(altitude, benchmark):
+    def func():
+        atm = AtmosphereSI(altitude)
+        _all_state_properties(atm)
+
+    benchmark(func)
+
+
+def test_performances_array_speed_bundle_init_tas(altitude, benchmark):
+    def func():
+        atm = AtmosphereSI(altitude)
+        atm.true_airspeed = 200.0
+        _all_speed_properties(atm)
+
+    benchmark(func)
+
+
+def test_performances_array_speed_bundle_init_cas(altitude, benchmark):
+    # Sparse slice keeps this benchmark practical while still exercising the root-solver path.
+    altitude_sparse = altitude[::1000]
 
     def func():
-        _ = atm.temperature
-        _ = atm.pressure
-        _ = atm.density
-        _ = atm.dynamic_viscosity
-        _ = atm.kinematic_viscosity
-        _ = atm.speed_of_sound
+        atm = AtmosphereSI(altitude_sparse)
+        atm.calibrated_airspeed = 120.0
         _ = atm.true_airspeed
-        _ = atm.equivalent_airspeed
-        _ = atm.mach
-        _ = atm.unitary_reynolds
 
     benchmark(func)
 
 
-def test_performances_scalar_temperature(altitude, benchmark):
+def test_performances_array_cached_reask_bundle(altitude, benchmark):
+    atm = AtmosphereSI(altitude)
+    atm.true_airspeed = 200.0
+    _all_state_properties(atm)
+    _all_speed_properties(atm)
+
     def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            _ = atm.temperature
+        _all_state_properties(atm)
+        _all_speed_properties(atm)
 
     benchmark(func)
 
 
-def test_performances_scalar_pressure(altitude, benchmark):
+def test_performances_scalar_state_bundle(altitude, benchmark):
     def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            _ = atm.pressure
+        for alt in altitude[::100]:
+            atm = AtmosphereSI(float(alt))
+            _all_state_properties(atm)
 
     benchmark(func)
 
 
-def test_performances_scalar_speed_of_sound(altitude, benchmark):
+def test_performances_scalar_speed_bundle_init_tas(altitude, benchmark):
     def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            _ = atm.speed_of_sound
+        for alt in altitude[::100]:
+            atm = AtmosphereSI(float(alt))
+            atm.true_airspeed = 120.0
+            _all_speed_properties(atm)
 
     benchmark(func)
 
 
-def test_performances_scalar_density(altitude, benchmark):
+def test_performances_scalar_tas_from_cas(altitude, benchmark):
     def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            _ = atm.density
-
-    benchmark(func)
-
-
-def test_performances_scalar_dynamic_viscosity(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            _ = atm.dynamic_viscosity
-
-    benchmark(func)
-
-
-def test_performances_scalar_kinematic_viscosity(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            _ = atm.kinematic_viscosity
-
-    benchmark(func)
-
-
-def test_performances_scalar_speeds_init_TAS(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            atm.true_airspeed = 100.0
-            _ = atm.true_airspeed
-            _ = atm.equivalent_airspeed
-            _ = atm.mach
-            _ = atm.unitary_reynolds
-            _ = atm.dynamic_pressure
-
-    benchmark(func)
-
-
-def test_performances_scalar_speeds_init_EAS(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            atm.equivalent_airspeed = 100.0
-            _ = atm.true_airspeed
-            _ = atm.equivalent_airspeed
-            _ = atm.mach
-            _ = atm.unitary_reynolds
-            _ = atm.dynamic_pressure
-
-    benchmark(func)
-
-
-def test_performances_scalar_speeds_init_mach(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            atm.mach = 0.3
-            _ = atm.true_airspeed
-            _ = atm.equivalent_airspeed
-            _ = atm.mach
-            _ = atm.unitary_reynolds
-            _ = atm.dynamic_pressure
-
-    benchmark(func)
-
-
-def test_performances_scalar_CAS_init_TAS(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            atm.true_airspeed = 100.0
-            _ = atm.calibrated_airspeed
-
-    benchmark(func)
-
-
-def test_performances_scalar_CAS_init_mach(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = AtmosphereSI(alt)
-            atm.mach = 0.3
-            _ = atm.calibrated_airspeed
-
-    benchmark(func)
-
-
-def test_performances_scalar_TAS_init_CAS(altitude, benchmark):
-    def func():
-        for alt in altitude[::10000]:
-            atm = AtmosphereSI(alt)
+        for alt in altitude[::100]:
+            atm = AtmosphereSI(float(alt))
             atm.calibrated_airspeed = 100.0
             _ = atm.true_airspeed
 

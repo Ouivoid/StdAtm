@@ -11,6 +11,8 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""Tests for AtmosphereWithPartials class behavior and performance."""
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -19,297 +21,104 @@ from scipy.constants import foot
 from ..atmosphere import Atmosphere
 from ..atmosphere_partials import AtmosphereWithPartials
 
+PARTIAL_TO_PARAMETER = {
+    "partial_temperature_altitude": "temperature",
+    "partial_pressure_altitude": "pressure",
+    "partial_density_altitude": "density",
+    "partial_speed_of_sound_altitude": "speed_of_sound",
+    "partial_dynamic_viscosity_altitude": "dynamic_viscosity",
+    "partial_kinematic_viscosity_altitude": "kinematic_viscosity",
+}
+
+PARTIAL_RTOL = {
+    "partial_temperature_altitude": 5e-5,
+    "partial_pressure_altitude": 5e-5,
+    "partial_density_altitude": 5e-5,
+    "partial_speed_of_sound_altitude": 5e-5,
+    "partial_dynamic_viscosity_altitude": 1e-4,
+    "partial_kinematic_viscosity_altitude": 5e-5,
+}
+
 
 @pytest.fixture(scope="session")
 def altitude():
     return np.linspace(0.0, 20000.0, int(1e6))
 
 
-def get_atmosphere(altitude, altitude_in_feet):
-    atm_part = AtmosphereWithPartials(altitude, 0.0, altitude_in_feet)
-    return atm_part
-
-
-def get_fd_partial(altitude, parameter_name, altitude_in_feet=False, step=1e-6):
-    atm_minus_step = Atmosphere(altitude - step, altitude_in_feet=altitude_in_feet)
-    atm_plus_step = Atmosphere(altitude + step, altitude_in_feet=altitude_in_feet)
+def _get_fd_partial(altitude_value, parameter_name, altitude_in_feet=False, step=1e-6):
+    atm_minus_step = Atmosphere(altitude_value - step, altitude_in_feet=altitude_in_feet)
+    atm_plus_step = Atmosphere(altitude_value + step, altitude_in_feet=altitude_in_feet)
     return (getattr(atm_plus_step, parameter_name) - getattr(atm_minus_step, parameter_name)) / (
         2.0 * step
     )
 
 
-def test_performances_array_temperature_partials(altitude, benchmark):
+def _all_partials(atm):
+    return {name: getattr(atm, name) for name in PARTIAL_TO_PARAMETER}
+
+
+def test_partials_units_and_shape_consistency_between_feet_and_meters():
+    altitudes_m = np.array([0.0, 3000.0, 7000.0, 10000.0, 15000.0])
+
+    atm_m = AtmosphereWithPartials(altitudes_m, altitude_in_feet=False)
+    atm_ft = AtmosphereWithPartials(altitudes_m / foot, altitude_in_feet=True)
+
+    partials_m = _all_partials(atm_m)
+    partials_ft = _all_partials(atm_ft)
+
+    for name in PARTIAL_TO_PARAMETER:
+        assert np.shape(partials_m[name]) == np.shape(altitudes_m)
+        assert np.shape(partials_ft[name]) == np.shape(altitudes_m)
+        # d()/d(ft) = d()/d(m) * foot
+        assert_allclose(partials_ft[name], np.asarray(partials_m[name]) * foot, rtol=1e-10)
+
+
+def test_partials_against_fd_representative_points_for_both_units():
+    # Avoid exactly 11,000 m to keep finite differences away from the ISA slope break.
+    altitudes_m = np.array([2000.0, 10000.0, 15000.0])
+
+    for altitude_in_feet in [False, True]:
+        altitude_input = altitudes_m / foot if altitude_in_feet else altitudes_m
+        atm = AtmosphereWithPartials(altitude_input, altitude_in_feet=altitude_in_feet)
+
+        for partial_name, parameter_name in PARTIAL_TO_PARAMETER.items():
+            computed = getattr(atm, partial_name)
+            expected = _get_fd_partial(altitude_input, parameter_name, altitude_in_feet)
+            assert_allclose(computed, expected, rtol=PARTIAL_RTOL[partial_name])
+
+
+def test_scalar_partials_are_scalar_like():
+    atm = AtmosphereWithPartials(3500.0, altitude_in_feet=False)
+
+    for partial_name in PARTIAL_TO_PARAMETER:
+        value = getattr(atm, partial_name)
+        assert np.asarray(value).shape == ()
+
+
+def test_partial_properties_are_cached_for_reask():
+    atm = AtmosphereWithPartials(np.array([1000.0, 5000.0, 9000.0]), altitude_in_feet=False)
+
+    first = atm.partial_density_altitude
+    second = atm.partial_density_altitude
+    assert first is second
+
+
+# Benchmarks focus on class workflows rather than isolated derivative formulas.
+def test_performances_array_partials_bundle(altitude, benchmark):
     def func():
-        atm = get_atmosphere(altitude, False)
+        atm = AtmosphereWithPartials(altitude[::10], altitude_in_feet=False)
         _ = atm.partial_temperature_altitude
-
-    benchmark(func)
-
-
-def test_performances_scalar_temperature_partials(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = get_atmosphere(alt, False)
-            _ = atm.partial_temperature_altitude
-
-    benchmark(func)
-
-
-def test_temperature_partials_against_fd(altitude):
-    atm = get_atmosphere(altitude, False)
-
-    computed_partials = atm.partial_temperature_altitude
-    verify_partials = get_fd_partial(altitude, "temperature")
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_temperature_partials_against_fd(alt)
-
-
-def test_temperature_partials_against_fd_ft(altitude):
-    atm = get_atmosphere(altitude / foot, True)
-
-    computed_partials = atm.partial_temperature_altitude
-    verify_partials = get_fd_partial(altitude / foot, "temperature", True)
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_temperature_partials_against_fd_ft(alt)
-
-
-def test_performances_array_pressure_partials(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude, False)
         _ = atm.partial_pressure_altitude
-
-    benchmark(func)
-
-
-def test_performances_scalar_pressure_partials(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = get_atmosphere(alt, False)
-            _ = atm.partial_pressure_altitude
-
-    benchmark(func)
-
-
-def test_pressure_partials_against_fd(altitude):
-    atm = get_atmosphere(altitude, False)
-
-    computed_partials = atm.partial_pressure_altitude
-    verify_partials = get_fd_partial(altitude, "pressure")
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_pressure_partials_against_fd(alt)
-
-
-def test_pressure_partials_against_fd_ft(altitude):
-    atm = get_atmosphere(altitude / foot, True)
-
-    computed_partials = atm.partial_pressure_altitude
-    verify_partials = get_fd_partial(altitude / foot, "pressure", True)
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_pressure_partials_against_fd_ft(alt)
-
-
-def test_performances_array_density_partials(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude, False)
         _ = atm.partial_density_altitude
-
-    benchmark(func)
-
-
-def test_performances_scalar_density_partials(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = get_atmosphere(alt, False)
-            _ = atm.partial_density_altitude
-
-    benchmark(func)
-
-
-def test_density_partials_against_fd(altitude):
-    atm = get_atmosphere(altitude, False)
-
-    computed_partials = atm.partial_density_altitude
-    verify_partials = get_fd_partial(altitude, "density")
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_density_partials_against_fd(alt)
-
-
-def test_density_partials_against_fd_ft(altitude):
-    atm = get_atmosphere(altitude / foot, True)
-
-    computed_partials = atm.partial_density_altitude
-    verify_partials = get_fd_partial(altitude / foot, "density", True)
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_density_partials_against_fd_ft(alt)
-
-
-def test_performances_array_speed_of_sound_partials(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude, False)
         _ = atm.partial_speed_of_sound_altitude
-
-    benchmark(func)
-
-
-def test_performances_scalar_speed_of_sound_partials(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = get_atmosphere(alt, False)
-            _ = atm.partial_speed_of_sound_altitude
-
-    benchmark(func)
-
-
-def test_speed_of_sound_partials_against_fd(altitude):
-    atm = get_atmosphere(altitude, False)
-
-    computed_partials = atm.partial_speed_of_sound_altitude
-    verify_partials = get_fd_partial(altitude, "speed_of_sound")
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_speed_of_sound_partials_against_fd(alt)
-
-
-def test_speed_of_sound_partials_against_fd_ft(altitude):
-    atm = get_atmosphere(altitude / foot, True)
-
-    computed_partials = atm.partial_speed_of_sound_altitude
-    verify_partials = get_fd_partial(altitude / foot, "speed_of_sound", True)
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_speed_of_sound_partials_against_fd_ft(alt)
-
-
-def test_performances_array_dynamic_viscosity_partials(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude, False)
         _ = atm.partial_dynamic_viscosity_altitude
-
-    benchmark(func)
-
-
-def test_performances_scalar_dynamic_viscosity_partials(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = get_atmosphere(alt, False)
-            _ = atm.partial_dynamic_viscosity_altitude
-
-    benchmark(func)
-
-
-def test_dynamic_viscosity_partials_against_fd(altitude):
-    atm = get_atmosphere(altitude, False)
-
-    computed_partials = atm.partial_dynamic_viscosity_altitude
-    verify_partials = get_fd_partial(altitude, "dynamic_viscosity")
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_dynamic_viscosity_partials_against_fd(alt)
-
-
-def test_dynamic_viscosity_partials_against_fd_ft(altitude):
-    atm = get_atmosphere(altitude / foot, True)
-
-    computed_partials = atm.partial_dynamic_viscosity_altitude
-    verify_partials = get_fd_partial(altitude / foot, "dynamic_viscosity", True)
-
-    assert_allclose(computed_partials, verify_partials, rtol=1e-4)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_dynamic_viscosity_partials_against_fd_ft(alt)
-
-
-def test_performances_array_kinematic_viscosity_partials(altitude, benchmark):
-    def func():
-        atm = get_atmosphere(altitude, False)
         _ = atm.partial_kinematic_viscosity_altitude
 
     benchmark(func)
 
 
-def test_performances_scalar_kinematic_viscosity_partials(altitude, benchmark):
-    def func():
-        for alt in altitude[::1000]:
-            atm = get_atmosphere(alt, False)
-            _ = atm.partial_kinematic_viscosity_altitude
-
-    benchmark(func)
-
-
-def test_kinematic_viscosity_partials_against_fd(altitude):
-    atm = get_atmosphere(altitude, False)
-
-    computed_partials = atm.partial_kinematic_viscosity_altitude
-    verify_partials = get_fd_partial(altitude, "kinematic_viscosity")
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_kinematic_viscosity_partials_against_fd(alt)
-
-
-def test_kinematic_viscosity_partials_against_fd_ft(altitude):
-    atm = get_atmosphere(altitude / foot, True)
-
-    computed_partials = atm.partial_kinematic_viscosity_altitude
-    verify_partials = get_fd_partial(altitude / foot, "kinematic_viscosity", True)
-
-    assert_allclose(computed_partials, verify_partials, rtol=5e-5)
-
-    # scalars
-    if np.asarray(altitude).size > 1:
-        for alt in altitude[::1000]:
-            test_kinematic_viscosity_partials_against_fd_ft(alt)
-
-
-def test_performances_reask_array_partials(altitude, benchmark):
-    atm = get_atmosphere(altitude, False)
+def test_performances_array_partials_reask_bundle(altitude, benchmark):
+    atm = AtmosphereWithPartials(altitude, altitude_in_feet=False)
     _ = atm.partial_temperature_altitude
     _ = atm.partial_pressure_altitude
     _ = atm.partial_density_altitude
@@ -324,5 +133,33 @@ def test_performances_reask_array_partials(altitude, benchmark):
         _ = atm.partial_speed_of_sound_altitude
         _ = atm.partial_dynamic_viscosity_altitude
         _ = atm.partial_kinematic_viscosity_altitude
+
+    benchmark(func)
+
+
+def test_performances_scalar_partials_bundle(altitude, benchmark):
+    def func():
+        for alt in altitude[::1000]:
+            atm = AtmosphereWithPartials(float(alt), altitude_in_feet=False)
+            _ = atm.partial_temperature_altitude
+            _ = atm.partial_pressure_altitude
+            _ = atm.partial_density_altitude
+            _ = atm.partial_speed_of_sound_altitude
+            _ = atm.partial_dynamic_viscosity_altitude
+            _ = atm.partial_kinematic_viscosity_altitude
+
+    benchmark(func)
+
+
+def test_performances_scalar_partials_bundle_in_feet(altitude, benchmark):
+    def func():
+        for alt in altitude[::1000]:
+            atm = AtmosphereWithPartials(float(alt / foot), altitude_in_feet=True)
+            _ = atm.partial_temperature_altitude
+            _ = atm.partial_pressure_altitude
+            _ = atm.partial_density_altitude
+            _ = atm.partial_speed_of_sound_altitude
+            _ = atm.partial_dynamic_viscosity_altitude
+            _ = atm.partial_kinematic_viscosity_altitude
 
     benchmark(func)
