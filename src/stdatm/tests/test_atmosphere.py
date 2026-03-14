@@ -1,4 +1,12 @@
-"""Tests for Atmosphere and AtmosphereSI classes."""
+"""Tests for `Atmosphere` and `AtmosphereSI` class behavior.
+
+Ownership note:
+- low-level state/speed formulas and their scalar/array benchmarks are covered in
+  `test_state_parameters.py` and `test_speed_parameters.py`
+- this file focuses on what happens once those formulas are wired into the
+  `Atmosphere` classes: unit handling, shape/broadcast semantics, speed setter
+  workflows, cache/re-ask behavior, and end-to-end class benchmarks
+"""
 #  This file is part of StdAtm
 #  Copyright (C) 2023 ONERA & ISAE-SUPAERO
 #  StdAtm is free software: you can redistribute it and/or modify
@@ -12,6 +20,8 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -21,9 +31,9 @@ from ..atmosphere import Atmosphere, AtmosphereSI
 
 
 class Checker:
-    """Reference conversion values used for class-level integration checks."""
+    """Reference class-level conversion results reused across integration scenarios."""
 
-    expected_tas = np.array(
+    expected_tas: ClassVar[np.ndarray] = np.array(
         [
             [100.0, 100.0, 100.0],
             [200.0, 200.0, 200.0],
@@ -33,7 +43,7 @@ class Checker:
             [800.0, 800.0, 800.0],
         ]
     )
-    expected_eas = np.array(
+    expected_eas: ClassVar[np.ndarray] = np.array(
         [
             [100.0, 98.543, 55.666],
             [200.0, 197.085, 111.333],
@@ -43,7 +53,7 @@ class Checker:
             [800.0, 788.341, 445.332],
         ]
     )
-    expected_cas = np.array(
+    expected_cas: ClassVar[np.ndarray] = np.array(
         [
             [100.0, 98.580, 56.269],
             [200.0, 197.362, 116.073],
@@ -53,7 +63,7 @@ class Checker:
             [800.0, 789.350, 479.567],
         ]
     )
-    expected_mach = np.array(
+    expected_mach: ClassVar[np.ndarray] = np.array(
         [
             [0.29386, 0.29488, 0.33723],
             [0.58773, 0.58976, 0.67446],
@@ -63,7 +73,7 @@ class Checker:
             [2.35091, 2.35903, 2.69782],
         ]
     )
-    expected_re1 = np.array(
+    expected_re1: ClassVar[np.ndarray] = np.array(
         [
             [6845941, 6683613, 2648139],
             [13691882, 13367227, 5296278],
@@ -73,7 +83,7 @@ class Checker:
             [54767527, 53468908, 21185111],
         ]
     )
-    expected_dynamic_pressure = np.array(
+    expected_dynamic_pressure: ClassVar[np.ndarray] = np.array(
         [
             [6125.0, 5947.8, 1898.0],
             [24500.0, 23791.1, 7591.9],
@@ -83,7 +93,7 @@ class Checker:
             [391999.7, 380656.9, 121471.0],
         ]
     )
-    expected_impact_pressure = np.array(
+    expected_impact_pressure: ClassVar[np.ndarray] = np.array(
         [
             [6258.4, 6078.2, 1952.6],
             [26689.4, 25932.3, 8495.0],
@@ -170,6 +180,8 @@ def test_speed_conversions_reference_results_with_and_without_broadcast():
 
 
 def _run_speed_conversion_tests(with_broadcast: bool):
+    # These checks intentionally stay at the class-integration level: they validate how
+    # `Atmosphere` wires speed setters/getters together, not the individual formulas.
     if with_broadcast:
         altitudes = [0.0, 1000.0, 35000.0]
         tas = np.array(Checker.expected_tas)[:, [0]]
@@ -228,6 +240,7 @@ def _all_speed_properties(atm):
 
 
 def test_performances_array_state_bundle(altitude, benchmark):
+    # Benchmark the full state-property access pattern exposed by the class.
     def func():
         atm = AtmosphereSI(altitude)
         _all_state_properties(atm)
@@ -236,6 +249,7 @@ def test_performances_array_state_bundle(altitude, benchmark):
 
 
 def test_performances_array_speed_bundle_init_tas(altitude, benchmark):
+    # Benchmark a common class workflow: initialize from TAS, then query all derived speeds.
     def func():
         atm = AtmosphereSI(altitude)
         atm.true_airspeed = 200.0
@@ -257,6 +271,7 @@ def test_performances_array_speed_bundle_init_cas(altitude, benchmark):
 
 
 def test_performances_array_cached_reask_bundle(altitude, benchmark):
+    # Re-asking cached properties is a distinct class behavior worth tracking separately.
     atm = AtmosphereSI(altitude)
     atm.true_airspeed = 200.0
     _all_state_properties(atm)

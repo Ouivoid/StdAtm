@@ -11,7 +11,15 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Tests for AtmosphereWithPartials class behavior and performance."""
+"""Tests for `AtmosphereWithPartials` class behavior and performance.
+
+Ownership note:
+- low-level partial-derivative formulas and their scalar/array benchmarks are covered in
+  `test_partials_state_parameters.py`
+- this file focuses on what happens once those formulas are exposed through the
+  `AtmosphereWithPartials` class: unit scaling, output shape, caching, representative
+  end-to-end checks, and class-level benchmarks
+"""
 
 import numpy as np
 import pytest
@@ -30,6 +38,8 @@ PARTIAL_TO_PARAMETER = {
     "partial_kinematic_viscosity_altitude": "kinematic_viscosity",
 }
 
+# Parameter-specific tolerances kept here because the class-level checks below compare
+# end-to-end finite differences through `Atmosphere`, not the isolated derivative helpers.
 PARTIAL_RTOL = {
     "partial_temperature_altitude": 5e-5,
     "partial_pressure_altitude": 5e-5,
@@ -54,6 +64,7 @@ def _get_fd_partial(altitude_value, parameter_name, altitude_in_feet=False, step
 
 
 def _all_partials(atm):
+    """Force evaluation of every exposed partial property on the class."""
     return {name: getattr(atm, name) for name in PARTIAL_TO_PARAMETER}
 
 
@@ -74,6 +85,8 @@ def test_partials_units_and_shape_consistency_between_feet_and_meters():
 
 
 def test_partials_against_fd_representative_points_for_both_units():
+    # Class-level spot checks are enough here because exhaustive formula validation lives in
+    # `test_partials_state_parameters.py`.
     # Avoid exactly 11,000 m to keep finite differences away from the ISA slope break.
     altitudes_m = np.array([2000.0, 10000.0, 15000.0])
 
@@ -118,6 +131,7 @@ def test_performances_array_partials_bundle(altitude, benchmark):
 
 
 def test_performances_array_partials_reask_bundle(altitude, benchmark):
+    # Cached re-ask benchmark: measure repeated property access on an already-populated object.
     atm = AtmosphereWithPartials(altitude, altitude_in_feet=False)
     _ = atm.partial_temperature_altitude
     _ = atm.partial_pressure_altitude

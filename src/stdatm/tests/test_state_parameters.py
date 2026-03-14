@@ -1,5 +1,10 @@
 """Unit and benchmark tests for functions in `state_parameters.py`.
 
+Ownership note:
+- this file owns low-level state-parameter formula validation and scalar/array benchmarks
+- class-level integration of these formulas through `Atmosphere` and `AtmosphereSI`
+  belongs in `test_atmosphere.py`
+
 The `EXPECTATIONS` table comes from the existing atmosphere reference values and is
 used to validate each function with scalar and vectorized inputs.
 """

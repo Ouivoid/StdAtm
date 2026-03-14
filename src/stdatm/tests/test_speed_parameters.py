@@ -1,5 +1,9 @@
 """Unit and benchmark tests for functions in `speed_parameters.py`.
 
+Ownership note:
+- this file owns low-level speed-parameter formula validation and scalar/array benchmarks
+- class-level wiring of those formulas through `Atmosphere` belongs in `test_atmosphere.py`
+
 The expected matrices mirror the historical atmosphere speed references used in
 `test_atmosphere.py` so behavior checks remain consistent while testing functions directly.
 """

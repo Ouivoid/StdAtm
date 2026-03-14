@@ -1,5 +1,10 @@
 """Unit and benchmark tests for functions in `partials_state_parameters.py`.
 
+Ownership note:
+- this file owns low-level partial-derivative formula validation and scalar/array benchmarks
+- class-level exposure of those derivatives through `AtmosphereWithPartials`
+  belongs in `test_atmosphere_partials.py`
+
 These tests compare analytical partial derivatives against finite-difference
 references and also benchmark scalar and vectorized call patterns.
 """
