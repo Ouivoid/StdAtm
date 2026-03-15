@@ -316,18 +316,20 @@ class Atmosphere:
         return self._adapt_shape(value)
 
     def _adapt_shape(self, value):
-        if isinstance(value, Real):
-            return value
-
         if value is not None:
+            if isinstance(self._altitude, Real) and isinstance(value, Real):
+                return value
+
             value = np.asarray(value)
-            if np.size(value) > 1:
+            if np.size(self._altitude) == 1:
+                return value
+            else:
                 try:
-                    expected_shape = np.shape(value + self.get_altitude())
+                    expected_shape = np.shape(value + self._altitude)
                 except ValueError as exc:
                     raise RuntimeError(
                         "Shape of provided value is not "
-                        f"compatible with shape of altitude {np.shape(self.get_altitude())}."
+                        f"compatible with shape of altitude {np.shape(self._altitude)}."
                     ) from exc
 
                 if value.shape != expected_shape:
